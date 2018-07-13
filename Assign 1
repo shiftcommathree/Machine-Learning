@@ -1,0 +1,271 @@
+%
+% Name: Hani Nguyen
+% UTA ID: 1000955693
+%
+
+function [ result ] = naive_bayes( path_training, path_test, type, number)
+  training_data = load(path_training);
+  test_data = load(path_test);
+  class_list = unique(training_data(:, end))';
+  
+  % Calculating the class num occurance.
+  class_size_map = containers.Map('KeyType', 'double', 'ValueType', 'double');
+  training_dataset_size = size(training_data, 1);
+  test_dataset_size = size(test_data, 1);
+  
+  for row = training_data.'
+    if isKey(class_size_map, row(end))
+      class_size_map(row(end)) = class_size_map(row(end)) + 1;
+    else
+      class_size_map(row(end)) = 1;
+    end
+  end
+  
+  if(strcmp(type, 'gaussians'))
+    % TRAINING
+    result_mean = [];
+    result_sd = [];
+    total_rows = size(training_data, 1);
+    for i = 1:length(class_list)
+      class_id = class_list(i);
+      attr_mat = [];
+      counter = 0;
+      for row = training_data.'
+        row = row';
+        if row(end) == class_id
+          row = row(1:end-1);
+          attr_mat = [attr_mat; row];
+          counter = counter + 1;
+        end
+      end
+      % Calculating the mean for the class.
+      mean = [];
+      for row = attr_mat.'
+        row = row';
+        if isempty(mean)
+          mean = [mean; row];
+        else
+          mean = mean + row;
+        end
+      end
+      mean = mean / counter;
+      % Calculating the Standard Deviation
+      sd = [];
+      for row = attr_mat
+        sd_value = std(row);
+        sd_value(sd_value < 0.01) = 0.01;
+        sd = [sd, sd_value];
+      end
+      % mean = matrix with the mean values
+      % sd = matrix with all the sd values
+      result_mean = [result_mean; class_id, mean];
+      result_sd = [result_sd; class_id, sd];
+      
+      
+      for j = 1:size(mean, 2)
+        disp(sprintf('Class %d, attribute %d, mean = %.2f, std = %.2f', ...
+          class_id, j, mean(j), sd(j)));
+      end
+    end
+
+    is_ties = 0;
+    is_correct_present = 0;
+    predicted_num = 0;
+    accuracy = 0;
+    row_num = 0;
+    total_accuracy = 0;
+    % TESTING
+    for row = test_data.'
+      row = row';
+      row_num = row_num + 1;
+      correct_class = row(end);
+      row = row(1:end-1);
+      predicted_class = -1;
+      max_probability = -1000;
+      for i = 1:size(result_mean)
+        y = 1;
+        mean_row = result_mean(i:i,:);
+        sd_row = result_sd(i:i,:);
+        current_class = mean_row(1);
+        mean_row = mean_row(2:end);
+        sd_row = sd_row(2:end);
+        y = normpdf(row, mean_row, sd_row);
+        res = class_size_map(current_class) / training_dataset_size;
+        for j = 1:size(y,2)
+          res = res * y(j);
+        end
+        if res > max_probability
+          max_probability = res;
+          predicted_class = current_class;
+          if predicted_class == correct_class
+            is_correct_present = 1;
+          else
+            is_correct_present = 0;
+          end
+          predicted_num = 1;
+          is_ties = 0;
+        elseif res == max_probability
+          is_ties = 1;
+          predicted_num = predicted_num + 1;
+          if current_class == correct_class
+            is_correct_present = 1;
+          end
+        end
+      end
+      if is_ties == 1
+        if is_correct_present == 1
+          accuracy = 1/predicted_num;
+        else
+          accuracy = 0;
+        end
+      elseif predicted_class == correct_class
+        accuracy = 1;
+      else
+        accuracy = 0;
+      end
+      disp(sprintf('ID=%5d, predicted=%3d, probability = %.4f, true=%3d, accuracy=%4.2f\n', ...
+        row_num, predicted_class, max_probability, correct_class, accuracy));
+      total_accuracy = total_accuracy + accuracy;
+      accuracy = 0;
+      is_correct_present = 0;
+      is_ties = 0;
+    end
+    disp(sprintf('Classification Accuracy %6.4f', total_accuracy/...
+      test_dataset_size));
+  elseif strcmp(type, 'histograms')
+    %TRAINING
+    if number < 3
+      disp('[ERROR!!]: Number of bin needs to greater than 3');
+      return;
+    end
+    num_classes = size(class_list,2);
+    num_attr = size(training_data,2)-1;  % -1 so we dont count class label
+    histogram = cell(number+1, num_attr, num_classes);
+    
+    list_histogram_index = 0;
+    
+    for class = class_list
+      list_histogram_index = list_histogram_index + 1;
+      attr_mat = [];
+      
+      % Getting the all attributes for the class.
+      for row = training_data.'
+        row = row';
+        if row(end) == class
+          row = row(:, 1:end-1);
+          attr_mat = [attr_mat; row];
+        end
+      end
+      
+      attribute_counter = 1;
+      % Scan through the rows and form bins
+      for row = attr_mat
+        
+        S = min(row);
+        L = max(row);
+        bin_upper_limits = [];
+        G = (L-S)/(number-3);
+  
+        if G < 0.0001
+          G = 0.0001;
+        end
+        
+        % Creating the upper limits
+        for i = 0:number-2
+          upper_limit = S - G/2 + G*i;
+          bin_upper_limits = [bin_upper_limits, upper_limit];
+        end
+        bin_upper_limits = [bin_upper_limits, Inf];
+        
+        bin_counter = zeros(1, number);
+        
+        % Placing the attr mems in the bins.
+        for idx = 1:size(row, 1)
+          ele = row(idx);
+          for i = 1:number
+            if ele < bin_upper_limits(i) == 1
+              bin_counter(i) = bin_counter(i) + 1;
+              break;
+            end
+          end
+        end
+    
+        % Calculate the Probability for that bin.
+        for i = 1:size(bin_counter, 2)
+          prob = bin_counter(i)/(size(row, 1) * G);
+          histogram{1, attribute_counter, list_histogram_index} = bin_upper_limits;
+          histogram{i+1, attribute_counter, list_histogram_index} = prob;
+          disp(sprintf('Class %d, attribute %d, bin %d, P(bin | class) = %.2f',class, attribute_counter, i, prob));
+        end
+        attribute_counter = attribute_counter + 1;
+      end 
+    end
+    
+    %TESTING
+    is_ties = 0;
+    is_correct_present = 0;
+    predicted_num = 0;
+    accuracy = 0;
+    row_num = 0;
+    counter_checker = 0;
+    total_accuracy = 0;
+    for row = test_data.'
+      row_num = row_num + 1;
+      max_probability = -100000;
+      predicted_class = -1;
+      correct_class = row(end);
+      row = row(1:end-1);
+      for list_histogram_index = 1:size(class_list, 2)
+        current_class = class_list(list_histogram_index);
+        probability = class_size_map(current_class) / training_dataset_size;
+        for attribute_counter = 1:size(row, 1)
+          test_attribute = row(attribute_counter);
+          bin_upper_limits = histogram{1, attribute_counter, list_histogram_index};
+          counter_checker = counter_checker +1;
+          for i = 1:number
+            if test_attribute < bin_upper_limits(i)
+              probability = probability * histogram{i+1, attribute_counter, list_histogram_index};
+              break;
+            end
+          end
+        end
+        if probability > max_probability
+          max_probability = probability;
+          predicted_class = current_class;
+          if predicted_class == correct_class
+            is_correct_present = 1;
+          else
+            is_correct_present = 0;
+          end
+          predicted_num = 1;
+          is_ties = 0;
+        elseif probability == max_probability
+          is_ties = 1;
+          predicted_num = predicted_num + 1;
+          if current_class == correct_class
+            is_correct_present = 1;
+          end
+        end
+      end
+      if is_ties == 1
+        if is_correct_present == 1
+          accuracy = 1/predicted_num;
+        else
+          accuracy = 0;
+        end
+      elseif predicted_class == correct_class
+        accuracy = 1;
+      else
+        accuracy = 0;
+      end
+      disp(sprintf('ID=%5d, predicted=%3d, probability = %.4f, true=%3d, accuracy=%4.2f\n', ...
+        row_num, predicted_class, max_probability, correct_class, accuracy));
+      total_accuracy = total_accuracy + accuracy;
+      accuracy = 0;
+      is_correct_present = 0;
+      is_ties = 0;
+    end
+    disp(sprintf('Classification Accuracy %6.4f', total_accuracy/...
+      test_dataset_size));
+  end
+end
