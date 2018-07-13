@@ -1,0 +1,157 @@
+
+% 
+% NAME: Hani Nguyen
+% UTA ID: 1000955693
+%
+
+function [result] = linear_regression(training_file, degree, test_file)
+  % Error check
+  if (degree <= 0)
+    disp('Degree needs to be a positive integer');
+  end
+
+  try
+    training_data = load(training_file);
+    test_data = load(test_file);
+  catch
+    disp('Sorry, was not able to read either one or both of the file');
+    disp('Please check the file names/path you have entered');
+    return;
+  end
+
+  [training_rows, training_cols] = size(training_data); 
+  [test_rows, test_cols] = size(test_data); 
+
+  % Getting all the classes
+  class_list = training_data(:, training_cols);
+  num_attributes = training_cols-1;
+
+  % Converting to binary classification problem
+  class_list(class_list > 1) = 0;
+  class_list(class_list < 1) = 0;
+
+  % Creating the Phi matrix with 0's initially.
+  phi = zeros(training_rows, 1+((degree)*(num_attributes))); 
+
+  % Creating the phi matrix
+  % Here N and M are number of attributes
+  % and number of data respectively.
+  % [
+  %   1, (x11), (x12)^2 ....(x1N)^2
+  %   .   .       .           .   
+  %   1  (xM1), (xM2)^2,....(xMN)^2
+  % ]
+  for row = 1:training_rows
+    phi(row, 1) = 1;
+    col_index = 2;
+    for col = 1:training_cols-1
+      for deg = 1:degree
+        phi(row, col_index) = training_data(row, col)^deg;
+        col_index = col_index+1;
+      end 
+    end
+  end
+
+  [prow, pcols] = size(phi);
+  % initially all the weights are going to be 0;
+  w = zeros(pcols, 1);
+
+  while true
+    % Equation 4.87, Pg 205
+    probability = transpose(w) * transpose(phi);
+    sigma_a = 1+exp(-probability);
+    sigma_a = 1 ./ sigma_a; 
+    yn = sigma_a';
+
+    [num_rows_yn, num_cols_yn] = size(yn);
+    R = zeros(num_rows_yn, num_rows_yn);
+
+    % Equation 4.98, Pg 208
+    for i = 1:num_rows_yn
+      calculation = yn(i, 1)*(1-yn(i, 1));
+      R(i, i) = calculation;
+    end
+
+    % Equation 4.97, Pg 207
+    H = transpose(phi)*R*phi;
+    % Equation 4.96, Pg 207
+    E = transpose(phi)*(yn-class_list);
+
+    % Equation 4.99, Pg 208
+    new_w = w - (pinv(H)*transpose(phi)*(yn-class_list));
+    w_diff = w - new_w;
+
+    if abs(sum(w_diff)) < 0.001
+      break;
+    end
+
+    probability = transpose(new_w)*transpose(phi);
+    sigma = 1+exp(-probability);
+    sigma = 1 ./ sigma;
+    yn = sigma';
+    NEW_E = transpose(phi)*(yn-class_list);
+    DIFF_E = NEW_E - E;
+
+    if abs(sum(DIFF_E)) < 0.001
+      break;
+    end
+
+    w = new_w;
+  end 
+
+  [w_row, w_col] = size(w);
+
+  % printing the weights
+  for i = 1:w_row
+    fprintf('w%d=%.4f \n', i-1, w(i));
+  end
+
+  class_list = test_data(:, test_cols);
+  class_list(class_list > 1) = 0;
+  class_list(class_list < 1) = 0;
+
+  test_phi = zeros(test_rows, 1+((degree)*(test_cols-1)));
+
+  for row = 1:test_rows
+    test_phi(row, 1) = 1;
+    col_index = 2;
+    for col = 1:test_cols-1
+      for deg = 1:degree
+        test_phi(row, col_index) = test_data(row, col)^deg;
+        col_index = col_index+1;
+      end 
+    end
+  end
+
+  [test_phi_rows, test_phi_cols] = size(test_phi);
+
+  probability = transpose(w)*transpose(test_phi);
+  sigma = 1+exp(-probability);
+  sigma = 1 ./ sigma;
+  yn = sigma';
+
+  probability(probability>0)=1;
+  probability(probability<0)=0;
+
+  probability = probability';
+  num_predicted_class = 0;
+
+  for row = 1: test_rows
+    predicted = probability(row);
+    prob = yn(row);
+    actual_prob = class_list(row);
+    accuracy = 0.0;
+    if predicted==0
+      prob = 1-prob;
+    end
+    if predicted == actual_prob
+      accuracy = 1.0;
+      num_predicted_class = num_predicted_class + 1;
+    end
+
+    fprintf('ID=%5d, predicted=%3d, probability = %.4f, true=%3d, accuracy=%4.2f\n', ...
+      row, predicted, prob, actual_prob, accuracy);
+  end
+  classification_accuracy =num_predicted_class/test_rows;
+  fprintf('classification accuracy=%6.4f \n', classification_accuracy);
+end
