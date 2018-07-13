@@ -1,0 +1,75 @@
+% 
+% Name: Hani Nguyen 
+% UTA ID: 1000955693
+% 
+function k_means_cluster(data_file, k, iterations)
+  file_data = load(data_file);
+  [fd_rows, fd_cols] = size(file_data);
+  
+  % Removing the predifined classes and randomly added classes
+  % Depending on the number of clusters given. 
+  file_data = file_data(:, 1:end-1);
+  random_classes = randi([1,k], fd_rows, 1);
+  file_data = [file_data random_classes];
+  clusters = calculate_clusters(file_data, k, fd_cols-1);
+  kMeansError = calculate_error(file_data, k, clusters);
+  fprintf('After initialization: error = %.4f\n', kMeansError);
+
+  for i=1:iterations
+    file_data = cluster_assignments(file_data, k, clusters);
+    clusters = calculate_clusters(file_data, k, fd_cols-1);
+    kMeansError = calculate_error(file_data, k, clusters);
+    fprintf('After iteration %d: error = %.4f\n', i, kMeansError);
+  end
+end
+
+function clusters = calculate_clusters(data, k, fd_cols)
+  clusters = zeros(k, fd_cols);
+  counter = 0;
+  for cluster_num=1:k
+    for i=1:size(data, 1)
+      if data(i, end) == cluster_num
+        clusters(cluster_num, :) = clusters(cluster_num, :) + data(i, 1:end-1);
+        counter = counter + 1;
+      end
+    end
+    clusters(cluster_num, :) = clusters(cluster_num, :)/counter;
+    counter = 0;
+  end
+end
+
+function kMeansError = calculate_error(data, k, cluster)
+  [data_row, data_col] = size(data);
+  kMeansError = 0.0;
+  for i=1:k
+    for j=1:data_row
+      if data(j, end) == i
+        kMeansError = kMeansError + calc_distance(data(j, 1:end-1), cluster(i,:), data_col-1);
+      end
+    end
+  end
+end
+
+function file_data = cluster_assignments(file_data, k, clusters)
+  [data_row, data_col] = size(file_data);
+  for i=1:data_row
+    distance = calc_distance(file_data(i, :), clusters(1, :), data_col-1);
+    new_cluster_num = 1;
+    for j=2:k
+      calc_dist = calc_distance(file_data(i, :), clusters(j,:), data_col-1);
+      if calc_dist < distance
+        distance = calc_dist;
+        new_cluster_num = j;
+      end
+    end
+    file_data(i, end) = new_cluster_num;
+  end
+end
+
+function distance = calc_distance(data_point, mean_val, num_points)
+  distance = 0.0;
+  for i=1:num_points
+    distance = distance + (data_point(1,i) - mean_val(1, i))^2;
+  end
+  distance = distance^(1/2);
+end
