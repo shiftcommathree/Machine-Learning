@@ -1,0 +1,120 @@
+
+% 
+% Name: Hani Nguyen
+% UTA ID: 1000955693
+%
+function [ result ] = neural_network(training_file, testing_file, layers, units_per_layer, rounds)
+
+    % Reading the training data file
+    % Calculating the size and using that to find the target values
+    % for each row in the training dataset.
+    try
+      training_data = load(training_file);
+    catch
+      warning('Problem Opening the file');
+      return;
+    end
+    [training_rows, training_cols] = size(training_data);
+    target = training_data(:,training_cols);
+    
+    % Finding the unique target values from all the ones that we collected
+    % That would be the output layer perceptron.
+    class_labels = unique(target);
+    perceptron_outerlayer = [1 ; class_labels];
+
+    % Removing the target values from the training data matrix and then
+    % Normalizing the values to the help us understand the data better. 
+    number_classes = size(class_labels, 1);
+    training_data = training_data(:,1:training_cols-1);
+    training_data = training_data./max(max(training_data));
+
+    % The Bias is X0 = 1
+    training_data = [ones(size(training_data,1),1) training_data];
+
+    % Based on the number of layers given, defining the layers and the num
+    % of units per layer.
+    total_layers = layers;
+    layer_perceptrons = zeros(layers,1);
+    dimensions = training_cols-1;
+    layer_perceptrons(1) = dimensions+1;
+
+    % Here we are filling up the layer_and_unit vector. 
+    % This would make the calculations easy.
+    if units_per_layer > 0 && layers > 2
+        for i = 2:total_layers-1
+           layer_perceptrons(i) =  units_per_layer+1;
+        end
+    end
+    % This is the last layer. 
+    layer_perceptrons(total_layers) = number_classes+1;
+    max_column = max(layer_perceptrons);
+
+    weights = backpropogation(rounds, training_data, target, perceptron_outerlayer, total_layers, layer_perceptrons);
+    % Begin Testing
+    try
+      testing_data = load(testing_file);
+    catch
+      warning('Error opening the testing file');
+      return;
+    end
+    % Pulling out the real classes from the test data which will be
+    % compared with the predicted classes later.
+    [testing_row, testing_col] = size(testing_data);
+    real_class = testing_data(:,testing_col);
+    
+    % The predicted classes are initially all 0.
+    predicted_class = zeros(size(real_class));
+    predicted_class(:,1) = -1;
+    
+    % Removing the last class label column from the testing matrix and also
+    % normalizing the data again.
+    testing_data = testing_data(:,1:testing_col-1);
+    testing_data = testing_data./max(max(testing_data));
+    % Adding the bais x0 again so we can then use the w0 weight on it. 
+    testing_data = [ones(size(testing_data,1),1) testing_data];
+
+    % Setting but the Z, A and the test matrix, just like we did in the
+    % training part.
+    testing_a = zeros(total_layers,max_column);
+    testing_a(:,1) = 1;
+    testing_z = zeros(total_layers,max_column);
+    testing_z(:,1) = 1;
+    testing_z(total_layers,1) = 0;
+    testing_col1 = size(testing_z(1,:), 2);
+    testing_col2 = size(testing_data(1,:), 2);
+    if testing_col1 > testing_col2
+        testing_data = [testing_data zeros(size(testing_data,1),testing_col1-testing_col2)];
+    end
+
+    
+    % Predicting the class for each row.
+    for row = 1:testing_row
+        testing_z(1,:) = testing_data(row,:);
+        for layer = 2:total_layers
+            testing_perceptron_nextlayer = layer_perceptrons(layer);
+            testing_perceptron_previouslayer = layer_perceptrons(layer-1);
+            for perceptron = 2:testing_perceptron_nextlayer
+                z_previouslayer = testing_z(layer-1,1:testing_perceptron_previouslayer);
+                testing_perceptron_weight = weights(layer,perceptron,1:testing_perceptron_previouslayer);
+                a_val_t = z_previouslayer*(squeeze(testing_perceptron_weight));
+                testing_a(layer,perceptron) = a_val_t;
+                testing_z(layer,perceptron) = 1/(1+exp(-1*a_val_t));
+            end
+        end
+        [max_value,index] = max(testing_z(total_layers,:));
+        % Needs to be done because the indexing starts at 1 and not 0. 
+        if index == 1
+            predicted_class(row) = 0;
+        else
+            predicted_class(row) = class_labels(index-1);
+        end
+    end
+    
+    % Final check.
+    correct_classification = (predicted_class==real_class);
+    for row = 1:testing_row
+        fprintf('ID=%5d, predicted=%3d, true=%3d, accuracy=%4.2f \n',row-1, predicted_class(row), real_class(row), correct_classification(row));
+    end
+
+    fprintf('classification accuracy=%6.4f \n', sum(correct_classification)/testing_row);
+end
