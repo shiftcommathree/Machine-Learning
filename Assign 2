@@ -1,7 +1,7 @@
 
 % 
-% NAME: Hani Nguyen
-% UTA ID: 1000955693
+% NAME: Hani 
+% 
 %
 
 function [result] = linear_regression(training_file, degree, test_file)
