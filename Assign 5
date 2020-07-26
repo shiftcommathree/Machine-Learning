@@ -1,6 +1,4 @@
 % 
-% Name: Hani Nguyen 
-% UTA ID: 1000955693
 % 
 function k_means_cluster(data_file, k, iterations)
   file_data = load(data_file);
