@@ -1,7 +1,5 @@
 
 % 
-% Name: Hani Nguyen
-% UTA ID: 1000955693
 %
 function [ result ] = neural_network(training_file, testing_file, layers, units_per_layer, rounds)
 
