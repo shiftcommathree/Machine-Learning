@@ -1,6 +1,6 @@
 %
-% Name: Hani Nguyen
-% UTA ID: 1000955693
+% Name: Hani
+%
 %
 
 function [ result ] = naive_bayes( path_training, path_test, type, number)
