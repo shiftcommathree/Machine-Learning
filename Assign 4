@@ -1,6 +1,4 @@
 %
-% Name: Hani Nguyen 
-% UTA ID: 1000955693
 %
 function [result] = decision_tree(training_file, test_file, option, pruning_thr)
   %{
